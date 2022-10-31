@@ -239,6 +239,75 @@ func (db *DB) FindInBatches(dest interface{}, batchSize int, fc func(tx *DB, bat
 	return tx
 }
 
+// FindInBatchesByTable finds all records in batches of batchSize
+func (db *DB) FindInBatchesByTable(dest interface{}, tableName string, batchSize int, fc func(tx *DB, batch int) error) *DB {
+	var (
+		tx = db.Order(clause.OrderByColumn{
+			Column: clause.Column{Table: clause.CurrentTable, Name: clause.PrimaryKey},
+		}).Session(&Session{})
+		queryDB      = tx
+		rowsAffected int64
+		batch        int
+	)
+
+	// user specified offset or limit
+	var totalSize int
+	if c, ok := tx.Statement.Clauses["LIMIT"]; ok {
+		if limit, ok := c.Expression.(clause.Limit); ok {
+			if limit.Limit != nil {
+				totalSize = *limit.Limit
+			}
+
+			if totalSize > 0 && batchSize > totalSize {
+				batchSize = totalSize
+			}
+
+			// reset to offset to 0 in next batch
+			tx = tx.Offset(-1).Session(&Session{})
+		}
+	}
+
+	for {
+		result := queryDB.Table(tableName).Limit(batchSize).Find(dest)
+		rowsAffected += result.RowsAffected
+		batch++
+
+		if result.Error == nil && result.RowsAffected != 0 {
+			fcTx := result.Session(&Session{NewDB: true})
+			fcTx.RowsAffected = result.RowsAffected
+			tx.AddError(fc(fcTx, batch))
+		} else if result.Error != nil {
+			tx.AddError(result.Error)
+		}
+
+		if tx.Error != nil || int(result.RowsAffected) < batchSize {
+			break
+		}
+
+		if totalSize > 0 {
+			if totalSize <= int(rowsAffected) {
+				break
+			}
+			if totalSize/batchSize == batch {
+				batchSize = totalSize % batchSize
+			}
+		}
+
+		// Optimize for-break
+		resultsValue := reflect.Indirect(reflect.ValueOf(dest))
+		if result.Statement.Schema.PrioritizedPrimaryField == nil {
+			tx.AddError(ErrPrimaryKeyRequired)
+			break
+		}
+
+		primaryValue, _ := result.Statement.Schema.PrioritizedPrimaryField.ValueOf(tx.Statement.Context, resultsValue.Index(resultsValue.Len()-1))
+		queryDB = tx.Clauses(clause.Gt{Column: clause.Column{Table: clause.CurrentTable, Name: clause.PrimaryKey}, Value: primaryValue})
+	}
+
+	tx.RowsAffected = rowsAffected
+	return tx
+}
+
 func (db *DB) assignInterfacesToValue(values ...interface{}) {
 	for _, value := range values {
 		switch v := value.(type) {
@@ -514,8 +583,9 @@ func (db *DB) Scan(dest interface{}) (tx *DB) {
 }
 
 // Pluck queries a single column from a model, returning in the slice dest. E.g.:
-//     var ages []int64
-//     db.Model(&users).Pluck("age", &ages)
+//
+//	var ages []int64
+//	db.Model(&users).Pluck("age", &ages)
 func (db *DB) Pluck(column string, dest interface{}) (tx *DB) {
 	tx = db.getInstance()
 	if tx.Statement.Model != nil {
