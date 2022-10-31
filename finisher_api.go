@@ -7,10 +7,10 @@ import (
 	"reflect"
 	"strings"
 
-	"gorm.io/gorm/clause"
-	"gorm.io/gorm/logger"
-	"gorm.io/gorm/schema"
-	"gorm.io/gorm/utils"
+	"github.com/iEvan-lhr/gorm/clause"
+	"github.com/iEvan-lhr/gorm/logger"
+	"github.com/iEvan-lhr/gorm/schema"
+	"github.com/iEvan-lhr/gorm/utils"
 )
 
 // Create inserts value, returning the inserted data's primary key in value's id

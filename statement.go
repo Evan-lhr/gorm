@@ -12,10 +12,10 @@ import (
 	"strings"
 	"sync"
 
-	"gorm.io/gorm/clause"
-	"gorm.io/gorm/logger"
-	"gorm.io/gorm/schema"
-	"gorm.io/gorm/utils"
+	"github.com/iEvan-lhr/gorm/clause"
+	"github.com/iEvan-lhr/gorm/logger"
+	"github.com/iEvan-lhr/gorm/schema"
+	"github.com/iEvan-lhr/gorm/utils"
 )
 
 // Statement statement
@@ -544,8 +544,9 @@ func (stmt *Statement) clone() *Statement {
 }
 
 // SetColumn set column's value
-//   stmt.SetColumn("Name", "jinzhu") // Hooks Method
-//   stmt.SetColumn("Name", "jinzhu", true) // Callbacks Method
+//
+//	stmt.SetColumn("Name", "jinzhu") // Hooks Method
+//	stmt.SetColumn("Name", "jinzhu", true) // Callbacks Method
 func (stmt *Statement) SetColumn(name string, value interface{}, fromCallbacks ...bool) {
 	if v, ok := stmt.Dest.(map[string]interface{}); ok {
 		v[name] = value
